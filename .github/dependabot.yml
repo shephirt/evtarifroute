@@ -5,7 +5,55 @@
 
 version: 2
 updates:
-  - package-ecosystem: "" # See documentation for possible values
-    directory: "/" # Location of package manifests
+  # Frontend (Vue 3 + Leaflet + Vite)
+  - package-ecosystem: "npm"
+    directory: "/frontend"
     schedule:
       interval: "weekly"
+    commit-message:
+      prefix: "chore(frontend)"
+    labels:
+      - "dependencies"
+      - "frontend"
+    groups:
+      npm-dependencies:
+        patterns:
+          - "*"
+
+  # Backend (FastAPI, SQLAlchemy, GeoAlchemy2, Alembic, etc.)
+  - package-ecosystem: "pip"
+    directory: "/backend"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(backend)"
+    labels:
+      - "dependencies"
+      - "backend"
+    groups:
+      pip-dependencies:
+        patterns:
+          - "*"
+
+  # Docker base images (Dockerfile: node/python; compose.yaml/compose.dev.yaml:
+  # postgis/postgis, caddy)
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(docker)"
+    labels:
+      - "dependencies"
+      - "docker"
+
+  # GitHub Actions workflow dependencies (actions/checkout, docker/build-push-action, etc.)
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+    commit-message:
+      prefix: "chore(ci)"
+    labels:
+      - "dependencies"
+      - "ci"
