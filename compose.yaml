@@ -33,7 +33,7 @@ services:
       retries: 10
 
   app:
-    image: ${GHCR_IMAGE:-ghcr.io/OWNER/REPO}:${IMAGE_TAG:-latest}
+    image: ${GHCR_IMAGE:-ghcr.io/shephirt/evtarifroute}:${IMAGE_TAG:-latest}
     restart: unless-stopped
     expose:
       - "8000"
