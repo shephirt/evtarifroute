@@ -1,0 +1,10 @@
+.env
+node_modules/
+__pycache__/
+*.pyc
+.venv/
+dist/
+
+# Internal planning/working docs (instructions, SRS, todo log) — not meant
+# for the public repo.
+planning/

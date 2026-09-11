@@ -1,0 +1,75 @@
+# Production deployment (the default compose file) — fully standalone, no
+# build step. Pulls the pre-built image published by the GitHub Actions
+# workflow (see .github/workflows/docker-image.yml) from GHCR.
+#
+# Usage on a production host:
+#   1. Copy this file, .env.example (-> .env), and caddy/Caddyfile to the host
+#      (you do NOT need the rest of the source tree — no build context here).
+#   2. Fill in .env: DB credentials, OCM_API_KEY, ORS_API_KEY, DOMAIN (your
+#      real public domain, for Caddy to obtain a Let's Encrypt cert
+#      automatically), and GHCR_IMAGE if it differs from the default below.
+#   3. docker compose up -d
+#
+# Only Caddy's 80/443 are exposed to the host; the app itself is only
+# reachable through the reverse proxy (internal Docker network).
+#
+# For local development (build from source instead of pulling the image, no
+# Caddy, direct port 8000), use compose.dev.yaml instead:
+#   docker compose -f compose.dev.yaml up -d --build
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    image: ${GHCR_IMAGE:-ghcr.io/OWNER/REPO}:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    expose:
+      - "8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      OCM_API_KEY: ${OCM_API_KEY}
+      ORS_API_KEY: ${ORS_API_KEY}
+      TARGET_REGIONS: ${TARGET_REGIONS}
+      ETL_INTERVAL_HOURS: ${ETL_INTERVAL_HOURS}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      app:
+        condition: service_healthy
+
+volumes:
+  db_data:
+  caddy_data:
+  caddy_config:

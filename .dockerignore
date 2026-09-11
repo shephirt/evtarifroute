@@ -1,0 +1,24 @@
+# Git / editor
+.git
+.gitignore
+.github
+
+# Docs (not needed inside the image)
+*.md
+
+# Env files (never bake secrets into the image)
+.env
+.env.*
+!.env.example
+
+# Backend
+backend/**/__pycache__
+backend/**/*.pyc
+.venv
+
+# Frontend
+frontend/node_modules
+frontend/dist
+
+# Misc
+.DS_Store

@@ -1,0 +1,49 @@
+# Local development — builds the app image from source (see Dockerfile) and
+# exposes it directly on :8000, no reverse proxy. This is what you want for
+# `docker compose -f compose.dev.yaml up -d --build` while working on the code.
+#
+# For a production deployment using the pre-built image published by CI
+# (GitHub Container Registry) plus a Caddy reverse proxy with automatic
+# HTTPS, use the default compose.yaml instead.
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./db/init:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: ${DATABASE_URL}
+      OCM_API_KEY: ${OCM_API_KEY}
+      ORS_API_KEY: ${ORS_API_KEY}
+      TARGET_REGIONS: ${TARGET_REGIONS}
+      ETL_INTERVAL_HOURS: ${ETL_INTERVAL_HOURS}
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health', timeout=5)"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+
+volumes:
+  db_data:
