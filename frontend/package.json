@@ -9,8 +9,9 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "vue": "^3.4.38",
-    "leaflet": "^1.9.4"
+    "leaflet": "^1.9.4",
+    "leaflet.markercluster": "^1.5.3",
+    "vue": "^3.4.38"
   },
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.8",

@@ -17,6 +17,25 @@ import json
 from sqlalchemy import text
 from sqlalchemy.orm import Session
 
+# Operator names that are really just "collectors" for many different,
+# unidentified individual CPOs rather than a single real operator (e.g. OCM's
+# own "(Unknown Operator)"/"(Business Owner at Location)" entries, plus our
+# own COALESCE fallback "Unknown Operator" for stations with no operator_id
+# at all). We assume every physical charging point actually belongs to some
+# distinct real-world operator, so lumping potentially hundreds of unrelated
+# locations under one bucket and ranking it by raw count would be
+# misleading — these are pushed to the bottom of the ranking instead of
+# competing on count.
+COLLECTOR_OPERATOR_NAMES = {
+    "unknown operator",
+    "(unknown operator)",
+    "(business owner at location)",
+}
+
+
+def _is_collector_operator(operator_name: str) -> bool:
+    return operator_name.strip().lower() in COLLECTOR_OPERATOR_NAMES
+
 
 def _build_filters(
     require_ac: bool,
@@ -95,13 +114,21 @@ def rank_operators_in_radius(
               )
               {extra_sql}
         GROUP BY o.id, o.name
-        ORDER BY station_count DESC
+        ORDER BY
+            (LOWER(COALESCE(o.name, 'Unknown Operator')) = ANY(:collector_names)) ASC,
+            station_count DESC
         """
     )
 
     rows = db.execute(
         query,
-        {"lat": latitude, "lon": longitude, "radius_m": radius_km * 1000, **extra_params},
+        {
+            "lat": latitude,
+            "lon": longitude,
+            "radius_m": radius_km * 1000,
+            "collector_names": list(COLLECTOR_OPERATOR_NAMES),
+            **extra_params,
+        },
     ).mappings()
 
     return [dict(row) for row in rows]
@@ -205,7 +232,13 @@ def rank_operators_along_route(
             }
         )
 
-    results.sort(key=lambda r: (-r["effective_station_count"], -r["station_count"]))
+    results.sort(
+        key=lambda r: (
+            _is_collector_operator(r["operator_name"]),
+            -r["effective_station_count"],
+            -r["station_count"],
+        )
+    )
     return results
 
 

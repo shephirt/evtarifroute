@@ -1,6 +1,9 @@
 <script setup>
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
+import "leaflet.markercluster";
+import "leaflet.markercluster/dist/MarkerCluster.css";
+import "leaflet.markercluster/dist/MarkerCluster.Default.css";
 import { onMounted, onBeforeUnmount, ref, watch } from "vue";
 
 const props = defineProps({
@@ -14,7 +17,7 @@ const props = defineProps({
 
 const mapEl = ref(null);
 let map = null;
-let stationLayer = null;
+let stationCluster = null;
 let routeLayer = null;
 let radiusLayer = null;
 
@@ -64,36 +67,74 @@ function popupContent(s) {
   return `<div class="station-popup">${rows.join("<br>")}</div>`;
 }
 
+// A pin-shaped marker (not a plain circle) — much more visible on a map at
+// a glance, and the pointed tip gives an unambiguous location anchor.
+function pinIcon(operatorId, highlighted, dimmed) {
+  const size = highlighted ? 30 : 26;
+  const opacity = dimmed ? 0.25 : 1;
+  return L.divIcon({
+    className: "station-pin-wrapper",
+    html: `<div class="station-pin" style="
+        width:${size}px;height:${size}px;
+        background:${colorForOperator(operatorId)};
+        opacity:${opacity};
+      "></div>`,
+    iconSize: [size, size],
+    // Anchor at the bottom point of the pin (the pin shape's "tip" sits at
+    // the bottom-center after the CSS rotation, see style below).
+    iconAnchor: [size / 2, size],
+    popupAnchor: [0, -size],
+  });
+}
+
+// Cluster icon: shows the total charger count in the cluster. Bucketed
+// into a few size classes so visually dense areas stand out more.
+function clusterIcon(cluster) {
+  const count = cluster.getChildCount();
+  let sizeClass = "small";
+  if (count >= 100) sizeClass = "large";
+  else if (count >= 20) sizeClass = "medium";
+
+  return L.divIcon({
+    html: `<div class="station-cluster station-cluster--${sizeClass}"><span>${count}</span></div>`,
+    className: "station-cluster-wrapper",
+    iconSize: L.point(40, 40),
+  });
+}
+
 function renderStations() {
   if (!map) return;
-  if (stationLayer) {
-    map.removeLayer(stationLayer);
+  if (stationCluster) {
+    map.removeLayer(stationCluster);
   }
-  stationLayer = L.layerGroup();
+
+  // Clusters nearby chargers into a single "N chargers" pin, which breaks
+  // apart into individual pins as you zoom in (disableClusteringAtZoom
+  // fully stops clustering once you're zoomed in close enough that
+  // individual stations are usefully distinguishable).
+  stationCluster = L.markerClusterGroup({
+    iconCreateFunction: clusterIcon,
+    maxClusterRadius: 60,
+    disableClusteringAtZoom: 16,
+    spiderfyOnMaxZoom: true,
+    showCoverageOnHover: false,
+  });
 
   const dimAll = anyActiveHighlight();
 
   for (const s of props.stations) {
     const highlighted = isHighlighted(s.operator_id);
-    const marker = L.circleMarker([s.latitude, s.longitude], {
-      radius: highlighted ? 9 : 7,
-      color: "#ffffff", // white outline for contrast against any map background
-      weight: 2,
-      fillColor: colorForOperator(s.operator_id),
-      fillOpacity: dimAll && !highlighted ? 0.2 : 0.95,
-      opacity: dimAll && !highlighted ? 0.2 : 1,
-      // Larger invisible padding around the marker to make it easier to
-      // click precisely, without visually enlarging the dot itself.
-      bubblingMouseEvents: false,
+    const marker = L.marker([s.latitude, s.longitude], {
+      icon: pinIcon(s.operator_id, highlighted, dimAll && !highlighted),
     });
     // Click to see full metadata (operator, power, connectors, spot count);
     // hover tooltip stays as a lightweight preview.
     marker.bindTooltip(`${s.operator_name}${s.station_name ? " — " + s.station_name : ""}`);
     marker.bindPopup(popupContent(s));
-    marker.addTo(stationLayer);
+    stationCluster.addLayer(marker);
   }
 
-  stationLayer.addTo(map);
+  map.addLayer(stationCluster);
 }
 
 function renderRoute() {
@@ -173,5 +214,56 @@ watch(() => [props.highlightOperatorId, props.highlightOperatorIds], renderStati
 .station-popup {
   font-size: 0.85rem;
   line-height: 1.5;
+}
+
+/* Classic map-pin shape: a circle with one corner squared off, rotated 45°
+   so the squared corner becomes a downward-pointing tip. */
+.station-pin-wrapper {
+  background: transparent !important;
+  border: none !important;
+}
+.station-pin {
+  border-radius: 50% 50% 50% 0;
+  border: 2px solid #ffffff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.5);
+  transform: rotate(-45deg);
+  cursor: pointer;
+}
+
+/* Cluster "summary" pins — shown instead of individual pins when several
+   chargers are close together at the current zoom level. */
+.station-cluster-wrapper {
+  background: transparent !important;
+  border: none !important;
+}
+.station-cluster {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 3px solid #ffffff;
+  box-shadow: 0 1px 6px rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  font-weight: 700;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  cursor: pointer;
+}
+.station-cluster--small {
+  width: 34px;
+  height: 34px;
+  font-size: 0.8rem;
+  background: #1a73e8;
+}
+.station-cluster--medium {
+  width: 42px;
+  height: 42px;
+  font-size: 0.9rem;
+  background: #1557b0;
+}
+.station-cluster--large {
+  width: 50px;
+  height: 50px;
+  font-size: 1rem;
+  background: #0d3d7a;
 }
 </style>
