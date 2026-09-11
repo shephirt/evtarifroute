@@ -1,5 +1,5 @@
 # --- Stage 1: build the Vue frontend into static assets ---
-FROM node:20-slim AS frontend-build
+FROM node:26-slim AS frontend-build
 WORKDIR /frontend
 COPY frontend/package.json ./
 RUN npm install
