@@ -36,7 +36,7 @@ updates:
           - "*"
 
   # Docker base images (Dockerfile: node/python; compose.yaml/compose.dev.yaml:
-  # postgis/postgis, caddy)
+  # postgis/postgis)
   - package-ecosystem: "docker"
     directory: "/"
     schedule:

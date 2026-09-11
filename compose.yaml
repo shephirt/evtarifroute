@@ -3,18 +3,18 @@
 # workflow (see .github/workflows/docker-image.yml) from GHCR.
 #
 # Usage on a production host:
-#   1. Copy this file, .env.example (-> .env), and caddy/Caddyfile to the host
-#      (you do NOT need the rest of the source tree — no build context here).
-#   2. Fill in .env: DB credentials, OCM_API_KEY, ORS_API_KEY, DOMAIN (your
-#      real public domain, for Caddy to obtain a Let's Encrypt cert
-#      automatically), and GHCR_IMAGE if it differs from the default below.
+#   1. Copy this file and .env.example (-> .env) to the host (you do NOT
+#      need the rest of the source tree — no build context here).
+#   2. Fill in .env: DB credentials, OCM_API_KEY, ORS_API_KEY, and
+#      optionally IMAGE_TAG (defaults to "latest").
 #   3. docker compose up -d
 #
-# Only Caddy's 80/443 are exposed to the host; the app itself is only
-# reachable through the reverse proxy (internal Docker network).
+# The app is published on :8000. Put your own reverse proxy / TLS
+# termination in front of it (Caddy, nginx, Traefik, whatever you already
+# run) — that's intentionally not included here.
 #
-# For local development (build from source instead of pulling the image, no
-# Caddy, direct port 8000), use compose.dev.yaml instead:
+# For local development (build from source instead of pulling the image),
+# use compose.dev.yaml instead:
 #   docker compose -f compose.dev.yaml up -d --build
 services:
   db:
@@ -33,10 +33,10 @@ services:
       retries: 10
 
   app:
-    image: ${GHCR_IMAGE:-ghcr.io/shephirt/evtarifroute}:${IMAGE_TAG:-latest}
+    image: ghcr.io/shephirt/evtarifroute:${IMAGE_TAG:-latest}
     restart: unless-stopped
-    expose:
-      - "8000"
+    ports:
+      - "8000:8000"
     environment:
       DATABASE_URL: ${DATABASE_URL}
       OCM_API_KEY: ${OCM_API_KEY}
@@ -53,23 +53,5 @@ services:
       retries: 5
       start_period: 10s
 
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      DOMAIN: ${DOMAIN:-localhost}
-    volumes:
-      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
-    depends_on:
-      app:
-        condition: service_healthy
-
 volumes:
   db_data:
-  caddy_data:
-  caddy_config:

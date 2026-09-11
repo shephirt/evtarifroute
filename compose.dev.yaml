@@ -3,8 +3,7 @@
 # `docker compose -f compose.dev.yaml up -d --build` while working on the code.
 #
 # For a production deployment using the pre-built image published by CI
-# (GitHub Container Registry) plus a Caddy reverse proxy with automatic
-# HTTPS, use the default compose.yaml instead.
+# (GitHub Container Registry), use the default compose.yaml instead.
 services:
   db:
     image: postgis/postgis:16-3.4

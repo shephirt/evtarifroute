@@ -8,7 +8,7 @@ A web-based analytical tool that recommends the most cost-effective EV charging 
 - **Backend:** Python (FastAPI), serving both the API and the built frontend from a single process
 - **Frontend:** Vue 3 + Leaflet
 - **Data sources:** [OpenChargeMap](https://openchargemap.org/) (charging station data) and [OpenRouteService](https://openrouteservice.org/) (geocoding + routing)
-- **Deployment:** Docker Compose — `compose.yaml` (production: pre-built image + Caddy reverse proxy) by default, `compose.dev.yaml` for local development (builds from source)
+- **Deployment:** Docker Compose — `compose.yaml` (production: pre-built image) by default, `compose.dev.yaml` for local development (builds from source). No reverse proxy is bundled — put your own in front (Caddy, nginx, Traefik, ...).
 
 ## Local Development
 
@@ -44,24 +44,24 @@ Vite's dev server proxies `/api/*` to `http://localhost:8000` (see `vite.config.
 
 ## Production Deployment
 
-`compose.yaml` is the default compose file and is production-oriented: it uses the pre-built image published by CI (see below) instead of building from source, plus a Caddy reverse proxy with automatic HTTPS. Fully standalone — you only need `compose.yaml`, `.env`, and `caddy/Caddyfile` on the server (not the full source tree).
+`compose.yaml` is the default compose file and is production-oriented: it uses the pre-built image published by CI (see below) instead of building from source. Fully standalone — you only need `compose.yaml` and `.env` on the server (not the full source tree).
 
 ```bash
 cp .env.example .env
-# Fill in DB credentials, OCM_API_KEY, ORS_API_KEY, DOMAIN (your real public
-# domain, for Caddy to obtain a Let's Encrypt certificate), and GHCR_IMAGE
-# (set to ghcr.io/<your-github-username>/<repo-name>)
+# Fill in DB credentials, OCM_API_KEY, ORS_API_KEY, and optionally IMAGE_TAG
+# (defaults to "latest"; pin to a specific version like "0.1.0" for
+# reproducible deployments)
 
 docker compose up -d
 ```
 
-Only Caddy's ports 80/443 are exposed to the host; the app itself is only reachable through the reverse proxy.
+The app is published on `:8000`. There is intentionally no reverse proxy / TLS termination bundled — put your own in front (Caddy, nginx, Traefik, or whatever you already run) pointing at that port.
 
 ## CI/CD
 
-`.github/workflows/docker-image.yml` builds the multi-stage Docker image (Vue frontend + FastAPI backend) and publishes it to GitHub Container Registry (`ghcr.io/<owner>/<repo>`) on every push to `main` and on version tags (`v*.*.*`). Pull requests build (but don't push) the image to validate it compiles.
+`.github/workflows/docker-image.yml` builds the multi-stage Docker image (Vue frontend + FastAPI backend) and publishes it to GitHub Container Registry (`ghcr.io/shephirt/evtarifroute`) on every push to `main` and on version tags (`v*.*.*`). Pull requests build (but don't push) the image to validate it compiles.
 
-After your first push, make the package public (or configure `compose.yaml`'s pull auth) under your GitHub repo's **Packages** tab, and set `GHCR_IMAGE`/`IMAGE_TAG` in your production `.env` accordingly.
+The package is public, so `docker compose up -d` can pull it without any registry login.
 
 ## Known Limitations
 
