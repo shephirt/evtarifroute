@@ -44,11 +44,19 @@ jobs:
         uses: docker/metadata-action@v6
         with:
           images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          # `latest=auto` (the default flavor) tags `latest` both on pushes
-          # to the default branch AND on the highest semver version tag —
-          # so releasing v0.1.0 correctly updates `latest` too, not just
-          # pushes to main.
+          # Explicit `latest` rule instead of relying on metadata-action's
+          # `latest=auto` flavor — that default turned out to only apply
+          # `latest` on semver *tag* pushes (v0.1.0), NOT on plain pushes to
+          # main (verified: `latest` stayed pinned to the v0.1.0 image for
+          # several subsequent main-branch pushes/fixes, silently serving
+          # stale/broken images). Since this workflow only ever runs on a
+          # `push` event for main-branch commits or version tags (see the
+          # `on:` triggers above — pull_request builds don't push at all),
+          # any `push` event reaching this step should update `latest`.
+          flavor: |
+            latest=false
           tags: |
+            type=raw,value=latest,enable=${{ github.event_name == 'push' }}
             type=ref,event=branch
             type=ref,event=pr
             type=semver,pattern={{version}}
